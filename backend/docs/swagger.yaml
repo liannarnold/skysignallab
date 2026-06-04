@@ -1,0 +1,94 @@
+basePath: /api
+definitions:
+  handlers.Signal:
+    properties:
+      band:
+        type: string
+      category:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      frequency:
+        type: number
+      id:
+        type: string
+      mode:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A full-stack SDR companion app for browsing radio signals and tracking
+    live ADS-B aircraft.
+  title: SkySignalLab API
+  version: "1.0"
+paths:
+  /signals:
+    get:
+      description: Returns all signals with optional filters
+      parameters:
+      - description: Filter by mode (AM, FM, NFM, USB, LSB)
+        in: query
+        name: mode
+        type: string
+      - description: Filter by category (HAM, Weather, Aviation, etc)
+        in: query
+        name: category
+        type: string
+      - description: Filter by band (2m, 40m, etc)
+        in: query
+        name: band
+        type: string
+      - description: Minimum frequency in MHz
+        in: query
+        name: freq_min
+        type: number
+      - description: Maximum frequency in MHz
+        in: query
+        name: freq_max
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.Signal'
+            type: array
+      summary: List all signals
+      tags:
+      - signals
+  /signals/{id}:
+    get:
+      description: Returns a signal by ID
+      parameters:
+      - description: Signal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.Signal'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a single signal
+      tags:
+      - signals
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

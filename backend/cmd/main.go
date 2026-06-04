@@ -15,8 +15,18 @@ import (
 	"github.com/liannarnold/skysignallab/internal/auth"
 	authMiddleware "github.com/liannarnold/skysignallab/internal/middleware"
 	"github.com/liannarnold/skysignallab/internal/handlers"
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.com/liannarnold/skysignallab/docs"
 )
 
+// @title           SkySignalLab API
+// @version         1.0
+// @description     A full-stack SDR companion app for browsing radio signals and tracking live ADS-B aircraft.
+// @host            localhost:8080
+// @BasePath        /api
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
@@ -52,6 +62,11 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, `{"status":"ok"}`)
 	})
+
+	// Swagger UI
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
+	))
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {

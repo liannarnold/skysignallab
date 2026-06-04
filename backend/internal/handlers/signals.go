@@ -20,7 +20,18 @@ type Signal struct {
 	Band        string  `json:"band,omitempty"`
 	CreatedAt   string  `json:"created_at"`
 }
-
+// GetSignals godoc
+// @Summary      List all signals
+// @Description  Returns all signals with optional filters
+// @Tags         signals
+// @Produce      json
+// @Param        mode      query  string  false  "Filter by mode (AM, FM, NFM, USB, LSB)"
+// @Param        category  query  string  false  "Filter by category (HAM, Weather, Aviation, etc)"
+// @Param        band      query  string  false  "Filter by band (2m, 40m, etc)"
+// @Param        freq_min  query  number  false  "Minimum frequency in MHz"
+// @Param        freq_max  query  number  false  "Maximum frequency in MHz"
+// @Success      200  {array}   Signal
+// @Router       /signals [get]
 func GetSignals(w http.ResponseWriter, r *http.Request) {
 	// Optional query filters
 	mode     := r.URL.Query().Get("mode")
@@ -85,6 +96,15 @@ func GetSignals(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(signals)
 }
 
+// GetSignal godoc
+// @Summary      Get a single signal
+// @Description  Returns a signal by ID
+// @Tags         signals
+// @Produce      json
+// @Param        id  path  string  true  "Signal ID"
+// @Success      200  {object}  Signal
+// @Failure      404  {object}  map[string]string
+// @Router       /signals/{id} [get]
 func GetSignal(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 

@@ -1,0 +1,141 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "A full-stack SDR companion app for browsing radio signals and tracking live ADS-B aircraft.",
+        "title": "SkySignalLab API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api",
+    "paths": {
+        "/signals": {
+            "get": {
+                "description": "Returns all signals with optional filters",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "signals"
+                ],
+                "summary": "List all signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by mode (AM, FM, NFM, USB, LSB)",
+                        "name": "mode",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by category (HAM, Weather, Aviation, etc)",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by band (2m, 40m, etc)",
+                        "name": "band",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Minimum frequency in MHz",
+                        "name": "freq_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Maximum frequency in MHz",
+                        "name": "freq_max",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.Signal"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/signals/{id}": {
+            "get": {
+                "description": "Returns a signal by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "signals"
+                ],
+                "summary": "Get a single signal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.Signal"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handlers.Signal": {
+            "type": "object",
+            "properties": {
+                "band": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "frequency": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}
