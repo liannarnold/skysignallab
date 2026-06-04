@@ -44,7 +44,8 @@ func main() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Logger)
+	r.Use(authMiddleware.RateLimit)
+	r.Use(authMiddleware.RequestLogger)
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
