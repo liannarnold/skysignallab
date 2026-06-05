@@ -1,24 +1,35 @@
-import { useState } from 'react'
-import { IconSearch, IconPlus, IconCopy, IconStar, IconStarFilled, IconChevronLeft, IconChevronRight } from '@tabler/icons-react'
+import { useState, useEffect, useCallback } from 'react'
+import { IconSearch, IconPlus, IconCopy, IconStar, IconStarFilled, IconChevronLeft, IconChevronRight, IconLoader2 } from '@tabler/icons-react'
 import Topbar from './Topbar'
+import { signalsApi, favoritesApi } from '../services/api'
 
 interface SignalsTabProps {
   sidebarExpanded: boolean
   setSidebarExpanded: (value: boolean) => void
 }
 
-const categories = ['All', 'HAM', 'Weather', 'Aviation', 'Marine', 'Emergency', 'CB', 'Broadcast']
+interface Signal {
+  id: string
+  frequency: number
+  mode: string
+  category: string
+  description: string
+  band?: string
+  created_at: string
+}
 
-const signalsData = [
-  { frequency: '162.4000', unit: 'MHz', mode: 'NFM', category: 'Weather', description: 'NOAA Weather Radio', favorited: true },
-  { frequency: '121.5000', unit: 'MHz', mode: 'AM', category: 'Aviation', description: 'Emergency Frequency', favorited: false },
-  { frequency: '156.8000', unit: 'MHz', mode: 'NFM', category: 'Marine', description: 'VHF Channel 16', favorited: false },
-  { frequency: '144.2000', unit: 'MHz', mode: 'USB', category: 'HAM', description: '2m SSB Calling', favorited: true },
-  { frequency: '146.5200', unit: 'MHz', mode: 'FM', category: 'HAM', description: '2m Simplex Calling', favorited: false },
-  { frequency: '27.1850', unit: 'MHz', mode: 'AM', category: 'CB', description: 'CB Radio Channel 19', favorited: false },
-  { frequency: '460.5250', unit: 'MHz', mode: 'NFM', category: 'Emergency', description: 'Police Primary Dispatch', favorited: false },
-  { frequency: '88.5000', unit: 'MHz', mode: 'FM', category: 'Broadcast', description: 'Local FM Public Radio', favorited: false },
-]
+interface Favorite {
+  id: string
+  signal_id: string
+  frequency: number
+  mode: string
+  description: string
+  category: string
+  notes?: string
+}
+
+const categories = ['All', 'HAM', 'Weather', 'Aviation', 'Marine', 'Emergency', 'CB', 'Broadcast']
+const PAGE_SIZE = 8
 
 const getModeColor = (mode: string) => {
   switch (mode) {
@@ -32,34 +43,101 @@ const getModeColor = (mode: string) => {
 }
 
 export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: SignalsTabProps) {
+  const [signals, setSignals] = useState<Signal[]>([])
+  const [favorites, setFavorites] = useState<Favorite[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
-  const [favorites, setFavorites] = useState<Record<string, boolean>>(
-    Object.fromEntries(signalsData.map(s => [s.frequency, s.favorited]))
-  )
   const [currentPage, setCurrentPage] = useState(1)
 
-  const toggleFavorite = (frequency: string) => {
-    setFavorites(prev => ({ ...prev, [frequency]: !prev[frequency] }))
+  // Fetch signals from API
+  const fetchSignals = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const filters = activeCategory !== 'All' ? { category: activeCategory } : {}
+      const data = await signalsApi.getAll(filters)
+      setSignals(data || [])
+      setCurrentPage(1)
+    } catch (err) {
+      setError('Failed to load signals')
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }, [activeCategory])
+
+  // Fetch favorites from API
+  const fetchFavorites = useCallback(async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const data = await favoritesApi.getAll()
+      setFavorites(data || [])
+    } catch (err) {
+      console.error('Failed to load favorites', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchSignals()
+  }, [fetchSignals])
+
+  useEffect(() => {
+    fetchFavorites()
+  }, [fetchFavorites])
+
+  const isFavorited = (signalId: string) =>
+    favorites.some(f => f.signal_id === signalId)
+
+  const getFavoriteId = (signalId: string) =>
+    favorites.find(f => f.signal_id === signalId)?.id
+
+  const toggleFavorite = async (signal: Signal) => {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      alert('Please log in to save favorites')
+      return
+    }
+    try {
+      if (isFavorited(signal.id)) {
+        const favId = getFavoriteId(signal.id)
+        if (favId) {
+          await favoritesApi.remove(favId)
+          setFavorites(prev => prev.filter(f => f.id !== favId))
+        }
+      } else {
+        const result = await favoritesApi.add(signal.id)
+        setFavorites(prev => [...prev, { ...result, signal_id: signal.id, frequency: signal.frequency, mode: signal.mode, description: signal.description, category: signal.category }])
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite', err)
+    }
   }
 
-  const copyFrequency = (frequency: string, unit: string) => {
-    navigator.clipboard.writeText(`${frequency} ${unit}`)
+  const copyFrequency = (frequency: number) => {
+    navigator.clipboard.writeText(`${frequency.toFixed(4)} MHz`)
   }
 
-  const filteredSignals = signalsData.filter(signal => {
-    const matchesCategory = activeCategory === 'All' || signal.category === activeCategory
-    const matchesSearch = searchQuery === '' || 
-      signal.frequency.includes(searchQuery) || 
-      signal.description.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+  // Client-side search filter
+  const filteredSignals = signals.filter(signal =>
+    searchQuery === '' ||
+    signal.frequency.toString().includes(searchQuery) ||
+    signal.description.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredSignals.length / PAGE_SIZE))
+  const paginatedSignals = filteredSignals.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  )
 
   return (
     <div className="h-full flex flex-col bg-page-bg">
-      <Topbar 
-        title="Signals" 
-
+      <Topbar
+        title="Signals"
         sidebarExpanded={sidebarExpanded}
         setSidebarExpanded={setSidebarExpanded}
         rightContent={
@@ -101,75 +179,96 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
 
       {/* Table */}
       <div className="flex-1 overflow-auto p-4">
-        <div className="bg-surface rounded-xl border overflow-hidden" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '12px' }}>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b" style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Frequency</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Mode</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Description</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wide">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSignals.map((signal, idx) => (
-                <tr 
-                  key={signal.frequency} 
-                  className={`border-b hover:bg-elevated/30 transition-colors ${idx === filteredSignals.length - 1 ? 'border-b-0' : ''}`}
-                  style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
-                >
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-primary">{signal.frequency} {signal.unit}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getModeColor(signal.mode)}`} style={{ borderRadius: '99px' }}>
-                      {signal.mode}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary text-sm">{signal.category}</td>
-                  <td className="px-4 py-3 text-text-primary text-sm">{signal.description}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => copyFrequency(signal.frequency, signal.unit)}
-                        className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary"
-                        aria-label="Copy frequency"
-                      >
-                        <IconCopy size={16} />
-                      </button>
-                      <button
-                        onClick={() => toggleFavorite(signal.frequency)}
-                        className="p-1.5 rounded-lg hover:bg-elevated transition-colors"
-                        aria-label="Toggle favorite"
-                      >
-                        {favorites[signal.frequency] ? (
-                          <IconStarFilled size={16} className="text-primary" />
-                        ) : (
-                          <IconStar size={16} className="text-text-secondary hover:text-primary" />
-                        )}
-                      </button>
-                    </div>
-                  </td>
+        {loading ? (
+          <div className="flex items-center justify-center h-full gap-2 text-text-secondary">
+            <IconLoader2 size={20} className="animate-spin" />
+            <span>Loading signals...</span>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full text-error">
+            {error}
+          </div>
+        ) : (
+          <div className="bg-surface rounded-xl border overflow-hidden" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '12px' }}>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b" style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Frequency</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Mode</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide">Description</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-text-tertiary uppercase tracking-wide">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {paginatedSignals.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-text-secondary text-sm">
+                      No signals found
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedSignals.map((signal, idx) => (
+                    <tr
+                      key={signal.id}
+                      className={`border-b hover:bg-elevated/30 transition-colors ${idx === paginatedSignals.length - 1 ? 'border-b-0' : ''}`}
+                      style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
+                    >
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-primary">{signal.frequency.toFixed(4)} MHz</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getModeColor(signal.mode)}`} style={{ borderRadius: '99px' }}>
+                          {signal.mode}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary text-sm">{signal.category}</td>
+                      <td className="px-4 py-3 text-text-primary text-sm">{signal.description}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => copyFrequency(signal.frequency)}
+                            className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary"
+                            aria-label="Copy frequency"
+                          >
+                            <IconCopy size={16} />
+                          </button>
+                          <button
+                            onClick={() => toggleFavorite(signal)}
+                            className="p-1.5 rounded-lg hover:bg-elevated transition-colors"
+                            aria-label="Toggle favorite"
+                          >
+                            {isFavorited(signal.id) ? (
+                              <IconStarFilled size={16} className="text-primary" />
+                            ) : (
+                              <IconStar size={16} className="text-text-secondary hover:text-primary" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
       <div className="px-4 py-3 flex items-center justify-between border-t" style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}>
-        <span className="text-sm text-text-secondary">Showing {filteredSignals.length} of 247 signals</span>
+        <span className="text-sm text-text-secondary">
+          Showing {paginatedSignals.length} of {filteredSignals.length} signals
+        </span>
         <div className="flex items-center gap-1">
-          <button 
+          <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary disabled:opacity-50"
             disabled={currentPage === 1}
           >
             <IconChevronLeft size={16} />
           </button>
-          {[1, 2, 3].map(page => (
+          {Array.from({ length: Math.min(totalPages, 3) }, (_, i) => i + 1).map(page => (
             <button
               key={page}
               onClick={() => setCurrentPage(page)}
@@ -182,20 +281,23 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
               {page}
             </button>
           ))}
-          <span className="text-text-tertiary px-1">...</span>
+          {totalPages > 3 && <span className="text-text-tertiary px-1">...</span>}
+          {totalPages > 3 && (
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              className={`w-8 h-8 rounded-lg text-sm transition-colors ${
+                currentPage === totalPages
+                  ? 'bg-primary text-page-bg'
+                  : 'hover:bg-elevated text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {totalPages}
+            </button>
+          )}
           <button
-            onClick={() => setCurrentPage(31)}
-            className={`w-8 h-8 rounded-lg text-sm transition-colors ${
-              currentPage === 31
-                ? 'bg-primary text-page-bg'
-                : 'hover:bg-elevated text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            31
-          </button>
-          <button 
-            onClick={() => setCurrentPage(p => p + 1)}
-            className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary disabled:opacity-50"
+            disabled={currentPage === totalPages}
           >
             <IconChevronRight size={16} />
           </button>

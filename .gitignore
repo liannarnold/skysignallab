@@ -24,6 +24,7 @@ go.work.sum
 # Environment files
 backend/.env
 .env
+frontend/.env.local
 
 # Node / Frontend
 frontend/node_modules/

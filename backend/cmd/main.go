@@ -17,6 +17,7 @@ import (
 	"github.com/liannarnold/skysignallab/internal/handlers"
 	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.com/liannarnold/skysignallab/docs"
+	"github.com/go-chi/cors"
 )
 
 // @title           SkySignalLab API
@@ -49,6 +50,16 @@ func main() {
 
 	// Initialize router
 	r := chi.NewRouter()
+
+	// CORS
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 
 	// Global middleware
 	r.Use(middleware.RequestID)
