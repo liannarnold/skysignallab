@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Circle, Popup, useMap } from 'react-leaflet'
+import { useState, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Circle, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { IconPlus, IconMinus, IconCurrentLocation, IconX } from '@tabler/icons-react'
 import Topbar from './Topbar'
 import 'leaflet/dist/leaflet.css'
+import { useEffect } from 'react'
 
 interface AircraftTabProps {
   sidebarExpanded: boolean
   setSidebarExpanded: (value: boolean) => void
 }
 
+// TODO: Replace with WebSocket connection to /ws/aircraft when SDR kit arrives
+// See backend/internal/adsb/ for dump1090 integration
 const aircraftData = [
   { id: 'AAL302', type: 'commercial', lat: 32.85, lng: -93.45, rotation: 45, airline: 'American Airlines', model: 'Boeing 737-800', route: 'Dallas → Atlanta', altitude: 14500, speed: 320, heading: 45, icao: 'A3F2B1', status: 'Climbing' },
   { id: 'DAL1582', type: 'commercial', lat: 32.35, lng: -93.95, rotation: 90, airline: 'Delta Air Lines', model: 'Airbus A321', route: 'Houston → Nashville', altitude: 35000, speed: 485, heading: 85, icao: 'AB2C3D', status: 'Cruising' },
@@ -25,16 +28,14 @@ const aircraftData = [
   { id: 'ASA231', type: 'commercial', lat: 32.10, lng: -93.85, rotation: 30, airline: 'Alaska Airlines', model: 'Boeing 737-900', route: 'Seattle → New Orleans', altitude: 37000, speed: 480, heading: 130, icao: 'AH5I6J', status: 'Cruising' },
 ]
 
-// Barksdale AFB coordinates
 const BARKSDALE_CENTER: [number, number] = [32.5012, -93.6627]
 
-// Create custom aircraft icons
 const createAircraftIcon = (color: string, rotation: number) => {
   return L.divIcon({
     className: 'aircraft-icon',
     html: `<div style="transform: rotate(${rotation}deg); color: ${color}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2L8 8H4L6 12L4 16H8L12 22L16 16H20L18 12L20 8H16L12 2Z"/>
+        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
       </svg>
     </div>`,
     iconSize: [24, 24],
@@ -42,79 +43,50 @@ const createAircraftIcon = (color: string, rotation: number) => {
   })
 }
 
-// Map controls component
 function MapControls({ onZoomIn, onZoomOut, onCenter }: { onZoomIn: () => void, onZoomOut: () => void, onCenter: () => void }) {
   return (
     <div className="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
-      <button 
-        onClick={onZoomIn}
-        className="p-2 bg-surface rounded-lg border text-text-secondary hover:text-text-primary transition-colors" 
-        style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '8px' }}
-      >
+      <button onClick={onZoomIn} className="p-2 bg-surface rounded-lg border text-text-secondary hover:text-text-primary transition-colors" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '8px' }}>
         <IconPlus size={18} />
       </button>
-      <button 
-        onClick={onZoomOut}
-        className="p-2 bg-surface rounded-lg border text-text-secondary hover:text-text-primary transition-colors" 
-        style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '8px' }}
-      >
+      <button onClick={onZoomOut} className="p-2 bg-surface rounded-lg border text-text-secondary hover:text-text-primary transition-colors" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '8px' }}>
         <IconMinus size={18} />
       </button>
-      <button 
-        onClick={onCenter}
-        className="p-2 bg-surface rounded-lg border text-text-secondary hover:text-text-primary transition-colors" 
-        style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '8px' }}
-      >
+      <button onClick={onCenter} className="p-2 bg-surface rounded-lg border text-text-secondary hover:text-text-primary transition-colors" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '8px' }}>
         <IconCurrentLocation size={18} />
       </button>
     </div>
   )
 }
 
-// Component to handle map operations
 function MapController({ mapRef }: { mapRef: React.MutableRefObject<L.Map | null> }) {
   const map = useMap()
-  
   useEffect(() => {
     mapRef.current = map
   }, [map, mapRef])
-  
   return null
 }
 
 export default function AircraftTab({ sidebarExpanded, setSidebarExpanded }: AircraftTabProps) {
   const [selectedAircraft, setSelectedAircraft] = useState<typeof aircraftData[0] | null>(aircraftData[0])
   const [drawerOpen, setDrawerOpen] = useState(true)
-  const mapRef = { current: null as L.Map | null }
+  const mapRef = useRef<L.Map | null>(null)
 
   const handleAircraftClick = (aircraft: typeof aircraftData[0]) => {
     setSelectedAircraft(aircraft)
     setDrawerOpen(true)
   }
 
-  const handleZoomIn = () => {
-    mapRef.current?.zoomIn()
-  }
-
-  const handleZoomOut = () => {
-    mapRef.current?.zoomOut()
-  }
-
-  const handleCenter = () => {
-    mapRef.current?.setView(BARKSDALE_CENTER, 9)
-  }
-
   const getAircraftColor = (aircraft: typeof aircraftData[0]) => {
-    if (selectedAircraft?.id === aircraft.id) return '#facc15' // selected - yellow
-    if (aircraft.type === 'military') return '#60a5fa' // military - blue
-    return '#fb923c' // commercial - orange
+    if (selectedAircraft?.id === aircraft.id) return '#facc15'
+    if (aircraft.type === 'military') return '#60a5fa'
+    return 'var(--accent-color)'
   }
 
   return (
     <div className="h-full flex flex-col bg-page-bg">
-      <Topbar 
-        title="Aircraft" 
-
+      <Topbar
+        title="Aircraft"
         sidebarExpanded={sidebarExpanded}
         setSidebarExpanded={setSidebarExpanded}
       >
@@ -127,7 +99,6 @@ export default function AircraftTab({ sidebarExpanded, setSidebarExpanded }: Air
         </div>
       </Topbar>
 
-      {/* Map Area */}
       <div className="flex-1 relative overflow-hidden">
         <MapContainer
           center={BARKSDALE_CENTER}
@@ -136,70 +107,50 @@ export default function AircraftTab({ sidebarExpanded, setSidebarExpanded }: Air
           zoomControl={false}
         >
           <MapController mapRef={mapRef} />
-          
-          {/* Dark map tiles */}
           <TileLayer
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
-
-          {/* Barksdale AFB Zone */}
           <Circle
             center={BARKSDALE_CENTER}
             radius={30000}
             pathOptions={{
-              color: '#fb923c',
-              fillColor: '#fb923c',
+              color: 'var(--accent-color)',
+              fillColor: 'var(--accent-color)',
               fillOpacity: 0.1,
               dashArray: '10, 10',
-              weight: 2
+              weight: 2,
             }}
           />
-
-          {/* Aircraft Markers */}
           {aircraftData.map(aircraft => (
             <Marker
               key={aircraft.id}
               position={[aircraft.lat, aircraft.lng]}
               icon={createAircraftIcon(getAircraftColor(aircraft), aircraft.rotation)}
-              eventHandlers={{
-                click: () => handleAircraftClick(aircraft)
-              }}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <strong>{aircraft.id}</strong><br/>
-                  {aircraft.airline}<br/>
-                  {aircraft.model}
-                </div>
-              </Popup>
-            </Marker>
+              eventHandlers={{ click: () => handleAircraftClick(aircraft) }}
+            />
           ))}
         </MapContainer>
 
-        {/* Map Controls */}
-        <MapControls 
-          onZoomIn={handleZoomIn} 
-          onZoomOut={handleZoomOut} 
-          onCenter={handleCenter} 
+        <MapControls
+          onZoomIn={() => mapRef.current?.zoomIn()}
+          onZoomOut={() => mapRef.current?.zoomOut()}
+          onCenter={() => mapRef.current?.setView(BARKSDALE_CENTER, 9)}
         />
 
         {/* Legend */}
-        <div 
-          className="absolute bottom-4 left-4 p-3 bg-surface rounded-xl border z-[1000]"
-          style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '12px' }}
-        >
+        <div className="absolute bottom-4 left-4 p-3 bg-surface rounded-xl border z-[1000]" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '12px' }}>
           <div className="flex flex-col gap-2 text-xs">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-primary" />
               <span className="text-text-secondary">Commercial</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-military" />
+              <span className="w-3 h-3 rounded-full" style={{ background: '#60a5fa' }} />
               <span className="text-text-secondary">Military</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-selected" />
+              <span className="w-3 h-3 rounded-full" style={{ background: '#facc15' }} />
               <span className="text-text-secondary">Selected</span>
             </div>
             <div className="flex items-center gap-2">
@@ -211,14 +162,12 @@ export default function AircraftTab({ sidebarExpanded, setSidebarExpanded }: Air
 
         {/* Aircraft Detail Drawer */}
         {drawerOpen && selectedAircraft && (
-          <div 
-            className="absolute bottom-0 left-0 right-0 bg-surface border-t p-4 z-[1000] animate-in slide-in-from-bottom duration-300"
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-surface border-t p-4 z-[1000]"
             style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
           >
             <div className="flex items-start justify-between mb-4">
-              <div>
-                <span className="font-mono text-2xl text-primary font-semibold">{selectedAircraft.id}</span>
-              </div>
+              <span className="font-mono text-2xl text-primary font-semibold">{selectedAircraft.id}</span>
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary"
@@ -227,7 +176,6 @@ export default function AircraftTab({ sidebarExpanded, setSidebarExpanded }: Air
               </button>
             </div>
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-4 mb-4">
               <div className="p-3 bg-elevated rounded-lg" style={{ borderRadius: '8px' }}>
                 <div className="text-xs text-text-tertiary mb-1">Altitude</div>
@@ -247,20 +195,11 @@ export default function AircraftTab({ sidebarExpanded, setSidebarExpanded }: Air
               </div>
             </div>
 
-            {/* Meta Pills */}
             <div className="flex flex-wrap gap-2">
-              <span className="px-3 py-1 bg-elevated rounded-full text-sm text-text-secondary" style={{ borderRadius: '99px' }}>
-                {selectedAircraft.airline}
-              </span>
-              <span className="px-3 py-1 bg-elevated rounded-full text-sm text-text-secondary" style={{ borderRadius: '99px' }}>
-                {selectedAircraft.model}
-              </span>
-              <span className="px-3 py-1 bg-elevated rounded-full text-sm text-text-secondary" style={{ borderRadius: '99px' }}>
-                {selectedAircraft.route}
-              </span>
-              <span className="px-3 py-1 bg-primary/20 rounded-full text-sm text-primary" style={{ borderRadius: '99px' }}>
-                {selectedAircraft.status}
-              </span>
+              <span className="px-3 py-1 bg-elevated rounded-full text-sm text-text-secondary" style={{ borderRadius: '99px' }}>{selectedAircraft.airline}</span>
+              <span className="px-3 py-1 bg-elevated rounded-full text-sm text-text-secondary" style={{ borderRadius: '99px' }}>{selectedAircraft.model}</span>
+              <span className="px-3 py-1 bg-elevated rounded-full text-sm text-text-secondary" style={{ borderRadius: '99px' }}>{selectedAircraft.route}</span>
+              <span className="px-3 py-1 bg-primary/20 rounded-full text-sm text-primary" style={{ borderRadius: '99px' }}>{selectedAircraft.status}</span>
             </div>
           </div>
         )}
