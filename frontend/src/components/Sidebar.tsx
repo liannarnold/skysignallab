@@ -5,9 +5,11 @@ import {
   IconPlane,
   IconStar,
   IconWaveSine,
-  IconSettings
+  IconSettings,
+  IconLogout
 } from '@tabler/icons-react'
 import type { TabId } from '../App'
+import { useAuth } from '../context/AuthContext'
 
 interface SidebarProps {
   activeTab: TabId
@@ -28,7 +30,18 @@ const accountItems = [
   { id: 'settings' as TabId, icon: IconSettings, label: 'Settings' },
 ]
 
+// Get initials from username
+const getInitials = (username: string) => {
+  const parts = username.trim().split(/[\s._-]/)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return username.slice(0, 2).toUpperCase()
+}
+
 export default function Sidebar({ activeTab, setActiveTab, expanded }: SidebarProps) {
+  const { user, logout } = useAuth()
+
   return (
     <aside 
       className={`h-full bg-surface border-r transition-all duration-300 flex flex-col ${
@@ -107,11 +120,31 @@ export default function Sidebar({ activeTab, setActiveTab, expanded }: SidebarPr
         </nav>
       </div>
 
-      {/* User Avatar */}
-      <div className={`p-3 border-t ${expanded ? '' : 'flex justify-center'}`} style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}>
-        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-          <span className="text-page-bg text-sm font-semibold">LA</span>
+      {/* User footer */}
+      <div
+        className={`p-3 border-t flex items-center gap-2 ${expanded ? '' : 'justify-center'}`}
+        style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
+      >
+        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+          <span className="text-page-bg text-xs font-semibold">
+            {user ? getInitials(user.username) : '?'}
+          </span>
         </div>
+        {expanded && (
+          <>
+            <span className="text-text-secondary text-xs flex-1 truncate">
+              {user?.username}
+            </span>
+            <button
+              onClick={logout}
+              className="p-1 rounded-lg hover:bg-elevated transition-colors text-text-tertiary hover:text-error"
+              aria-label="Logout"
+              title="Logout"
+            >
+              <IconLogout size={16} />
+            </button>
+          </>
+        )}
       </div>
     </aside>
   )

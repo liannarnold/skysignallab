@@ -7,44 +7,21 @@ import AircraftTab from './components/AircraftTab'
 import FavoritesTab from './components/FavoritesTab'
 import MySignalsTab from './components/MySignalsTab'
 import SettingsTab from './components/SettingsTab'
+import LoginModal from './components/LoginModal'
+import { useAuth } from './context/AuthContext'
 
 export type TabId = 'signals' | 'ham' | 'fmam' | 'aircraft' | 'favorites' | 'mysignals' | 'settings'
 
 function App() {
+  const { isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = useState<TabId>('signals')
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
   const [accentColor, setAccentColor] = useState('#fb923c')
-  const [soundEffects, setSoundEffects] = useState(true)
 
   // Update CSS variable when accent color changes
   useEffect(() => {
     document.documentElement.style.setProperty('--color-primary', accentColor)
   }, [accentColor])
-
-  // Play click sound for UI interactions
-  const playClickSound = () => {
-    if (soundEffects) {
-      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.value = 800
-      oscillator.type = 'sine'
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
-      
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.1)
-    }
-  }
-
-  const handleTabChange = (tab: TabId) => {
-    playClickSound()
-    setActiveTab(tab)
-  }
 
   const renderTab = () => {
     switch (activeTab) {
@@ -69,9 +46,10 @@ function App() {
 
   return (
     <div className="flex h-screen bg-page-bg overflow-hidden">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      {!isAuthenticated && <LoginModal />}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         expanded={sidebarExpanded}
       />
       <main className="flex-1 overflow-hidden">
