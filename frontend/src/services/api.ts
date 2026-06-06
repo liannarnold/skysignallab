@@ -119,3 +119,15 @@ export const userSignalsApi = {
   remove: (id: string) =>
     request(`/api/user-signals/${id}`, { method: 'DELETE' }),
 }
+
+// ── External ──────────────────────────────────────
+export const externalApi = {
+  getBandConditions: () => request('/api/band-conditions'),
+  getRepeaters: (lat?: string, lng?: string) => {
+    const params = new URLSearchParams()
+    if (lat) params.set('lat', lat)
+    if (lng) params.set('lng', lng)
+    const query = params.toString()
+    return request(`/api/repeaters${query ? `?${query}` : ''}`)
+  },
+}

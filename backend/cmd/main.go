@@ -11,13 +11,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/liannarnold/skysignallab/internal/db"
-	"github.com/liannarnold/skysignallab/internal/auth"
-	authMiddleware "github.com/liannarnold/skysignallab/internal/middleware"
-	"github.com/liannarnold/skysignallab/internal/handlers"
-	httpSwagger "github.com/swaggo/http-swagger"
-	_ "github.com/liannarnold/skysignallab/docs"
 	"github.com/go-chi/cors"
+	_ "github.com/liannarnold/skysignallab/docs"
+	"github.com/liannarnold/skysignallab/internal/auth"
+	"github.com/liannarnold/skysignallab/internal/db"
+	"github.com/liannarnold/skysignallab/internal/handlers"
+	authMiddleware "github.com/liannarnold/skysignallab/internal/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // @title           SkySignalLab API
@@ -92,6 +92,10 @@ func main() {
 			r.Get("/", handlers.GetSignals)
 			r.Get("/{id}", handlers.GetSignal)
 		})
+
+		// External integrations
+		r.Get("/band-conditions", handlers.GetBandConditions)
+		r.Get("/repeaters", handlers.GetRepeaters)
 
 		// Protected routes — require JWT
 		r.Group(func(r chi.Router) {

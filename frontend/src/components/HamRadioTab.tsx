@@ -1,40 +1,38 @@
-import { useState } from 'react'
-import { IconMapPin, IconChevronRight, IconChevronLeft } from '@tabler/icons-react'
+import { useState, useEffect, useCallback } from 'react'
+import { IconMapPin, IconChevronRight, IconChevronLeft, IconLoader2 } from '@tabler/icons-react'
 import Topbar from './Topbar'
+import { externalApi } from '../services/api'
 
 interface HamRadioTabProps {
   sidebarExpanded: boolean
   setSidebarExpanded: (value: boolean) => void
 }
 
-const bandConditions = [
-  { band: '80m', status: 'Good', noise: 'S3', color: 'bg-success text-page-bg' },
-  { band: '40m', status: 'Good', noise: 'S2', color: 'bg-success text-page-bg' },
-  { band: '20m', status: 'Fair', noise: 'S4', color: 'bg-warning text-page-bg' },
-  { band: '17m', status: 'Fair', noise: 'S5', color: 'bg-warning text-page-bg' },
-  { band: '15m', status: 'Poor', noise: 'S7', color: 'bg-error text-page-bg' },
-  { band: '10m', status: 'Poor', noise: 'S8', color: 'bg-error text-page-bg' },
-  { band: '2m', status: 'Good', noise: 'S1', color: 'bg-success text-page-bg' },
-  { band: '70cm', status: 'Good', noise: 'S1', color: 'bg-success text-page-bg' },
-]
+interface BandCondition {
+  band: string
+  time: string
+  condition: string
+}
 
-const frequencyTypes = ['HF', 'VHF', 'UHF']
+interface Repeater {
+  callsign: string
+  frequency: string
+  offset: string
+  pl: string
+  band: string
+  location: string
+}
 
 const frequencies = [
-  { frequency: '3.885', unit: 'MHz', mode: 'LSB', description: '75m Phone Net', band: '80m' },
-  { frequency: '7.290', unit: 'MHz', mode: 'LSB', description: '40m Traffic Net', band: '40m' },
-  { frequency: '14.300', unit: 'MHz', mode: 'USB', description: 'Maritime Mobile Service', band: '20m' },
-  { frequency: '21.340', unit: 'MHz', mode: 'USB', description: '15m Calling', band: '15m' },
-  { frequency: '144.200', unit: 'MHz', mode: 'USB', description: '2m SSB Calling', band: '2m' },
-  { frequency: '146.520', unit: 'MHz', mode: 'FM', description: '2m National Simplex', band: '2m' },
-  { frequency: '446.000', unit: 'MHz', mode: 'FM', description: '70cm National Simplex', band: '70cm' },
-]
-
-const repeaters = [
-  { callsign: 'W5SLA', frequency: '146.940', offset: '-', pl: '107.2', band: '2m' },
-  { callsign: 'K5QHD', frequency: '147.060', offset: '+', pl: '88.5', band: '2m' },
-  { callsign: 'W5BII', frequency: '444.850', offset: '+', pl: '100.0', band: '70cm' },
-  { callsign: 'K5WMB', frequency: '442.125', offset: '+', pl: '103.5', band: '70cm' },
+  { frequency: '3.885', unit: 'MHz', mode: 'LSB', description: '75m Phone Net', band: '80m', type: 'HF' },
+  { frequency: '7.290', unit: 'MHz', mode: 'LSB', description: '40m Traffic Net', band: '40m', type: 'HF' },
+  { frequency: '14.300', unit: 'MHz', mode: 'USB', description: 'Maritime Mobile Service', band: '20m', type: 'HF' },
+  { frequency: '21.340', unit: 'MHz', mode: 'USB', description: '15m Calling', band: '15m', type: 'HF' },
+  { frequency: '28.400', unit: 'MHz', mode: 'USB', description: '10m SSB Calling', band: '10m', type: 'HF' },
+  { frequency: '144.200', unit: 'MHz', mode: 'USB', description: '2m SSB Calling', band: '2m', type: 'VHF' },
+  { frequency: '146.520', unit: 'MHz', mode: 'FM', description: '2m National Simplex', band: '2m', type: 'VHF' },
+  { frequency: '446.000', unit: 'MHz', mode: 'FM', description: '70cm National Simplex', band: '70cm', type: 'UHF' },
+  { frequency: '432.100', unit: 'MHz', mode: 'USB', description: '70cm SSB Calling', band: '70cm', type: 'UHF' },
 ]
 
 const bandPlan = [
@@ -48,6 +46,8 @@ const bandPlan = [
   { band: '70cm', range: '420.000 - 450.000 MHz', modes: 'CW, SSB, FM' },
 ]
 
+const frequencyTypes = ['HF', 'VHF', 'UHF']
+
 const getModeColor = (mode: string) => {
   switch (mode) {
     case 'LSB': return 'bg-[#1a2a1a] text-success'
@@ -58,15 +58,59 @@ const getModeColor = (mode: string) => {
   }
 }
 
+const getConditionStyle = (condition: string) => {
+  switch (condition.toLowerCase()) {
+    case 'good': return 'bg-success-bg text-success'
+    case 'fair': return 'bg-warning-bg text-warning'
+    case 'poor': return 'bg-error-bg text-error'
+    default: return 'bg-elevated text-text-secondary'
+  }
+}
+
 export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: HamRadioTabProps) {
   const [activeType, setActiveType] = useState('HF')
   const [panelExpanded, setPanelExpanded] = useState(true)
+  const [bandConditions, setBandConditions] = useState<BandCondition[]>([])
+  const [repeaters, setRepeaters] = useState<Repeater[]>([])
+  const [loadingConditions, setLoadingConditions] = useState(true)
+  const [loadingRepeaters, setLoadingRepeaters] = useState(true)
+
+  const fetchBandConditions = useCallback(async () => {
+    try {
+      setLoadingConditions(true)
+      const data = await externalApi.getBandConditions()
+      // Only show daytime conditions
+      setBandConditions((data || []).filter((b: BandCondition) => b.time === 'day'))
+    } catch (err) {
+      console.error('Failed to fetch band conditions', err)
+    } finally {
+      setLoadingConditions(false)
+    }
+  }, [])
+
+  const fetchRepeaters = useCallback(async () => {
+    try {
+      setLoadingRepeaters(true)
+      const data = await externalApi.getRepeaters()
+      setRepeaters(data || [])
+    } catch (err) {
+      console.error('Failed to fetch repeaters', err)
+    } finally {
+      setLoadingRepeaters(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchBandConditions()
+    fetchRepeaters()
+  }, [fetchBandConditions, fetchRepeaters])
+
+  const filteredFrequencies = frequencies.filter(f => f.type === activeType)
 
   return (
     <div className="h-full flex flex-col bg-page-bg">
-      <Topbar 
-        title="HAM Radio" 
-
+      <Topbar
+        title="HAM Radio"
         sidebarExpanded={sidebarExpanded}
         setSidebarExpanded={setSidebarExpanded}
       >
@@ -78,21 +122,30 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
 
       {/* Band Conditions Strip */}
       <div className="px-4 py-3 border-b" style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-text-tertiary uppercase tracking-wide font-medium">HF Band Conditions</span>
-          <div className="flex gap-2 flex-wrap">
-            {bandConditions.map(band => (
-              <div 
-                key={band.band}
-                className={`px-2 py-1 rounded-lg text-xs font-medium ${band.color}`}
-                style={{ borderRadius: '8px' }}
-              >
-                <div className="font-semibold">{band.band}</div>
-                <div className="opacity-80">{band.status} · {band.noise}</div>
-              </div>
-            ))}
-          </div>
-          <span className="text-xs text-text-disabled ml-auto">via hamqsl.com</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-text-tertiary uppercase tracking-wide font-medium whitespace-nowrap">
+            HF Band Conditions
+          </span>
+          {loadingConditions ? (
+            <div className="flex items-center gap-2 text-text-secondary text-xs">
+              <IconLoader2 size={14} className="animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="flex gap-2 flex-wrap">
+              {bandConditions.map(band => (
+                <div
+                  key={band.band}
+                  className={`px-2 py-1 rounded-lg text-xs font-medium ${getConditionStyle(band.condition)}`}
+                  style={{ borderRadius: '8px' }}
+                >
+                  <div className="font-semibold">{band.band}</div>
+                  <div className="opacity-80">{band.condition}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <span className="text-xs text-text-disabled ml-auto whitespace-nowrap">via hamqsl.com</span>
         </div>
       </div>
 
@@ -100,7 +153,6 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
       <div className="flex-1 flex overflow-hidden">
         {/* Frequency List */}
         <div className="flex-1 overflow-auto p-4">
-          {/* Filter Chips */}
           <div className="flex gap-2 mb-4">
             {frequencyTypes.map(type => (
               <button
@@ -117,7 +169,6 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
             ))}
           </div>
 
-          {/* Frequency Table */}
           <div className="bg-surface rounded-xl border overflow-hidden" style={{ borderColor: '#1c2440', borderWidth: '0.5px', borderRadius: '12px' }}>
             <table className="w-full">
               <thead>
@@ -129,10 +180,10 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
                 </tr>
               </thead>
               <tbody>
-                {frequencies.map((freq, idx) => (
-                  <tr 
+                {filteredFrequencies.map((freq, idx) => (
+                  <tr
                     key={freq.frequency}
-                    className={`border-b hover:bg-elevated/30 transition-colors ${idx === frequencies.length - 1 ? 'border-b-0' : ''}`}
+                    className={`border-b hover:bg-elevated/30 transition-colors ${idx === filteredFrequencies.length - 1 ? 'border-b-0' : ''}`}
                     style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
                   >
                     <td className="px-4 py-3">
@@ -157,11 +208,11 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
         </div>
 
         {/* Right Panel */}
-        <div 
+        <div
           className={`border-l bg-surface transition-all duration-300 flex ${panelExpanded ? 'w-80' : 'w-8'}`}
           style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
         >
-          {panelExpanded ? (
+          {panelExpanded && (
             <div className="flex-1 overflow-auto p-4">
               {/* Local Repeaters */}
               <div className="mb-6">
@@ -169,25 +220,33 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
                   <h3 className="text-sm font-semibold text-text-primary">Local Repeaters</h3>
                   <span className="px-2 py-0.5 rounded-full text-xs bg-elevated text-text-secondary" style={{ borderRadius: '99px' }}>50mi</span>
                 </div>
-                <div className="space-y-2">
-                  {repeaters.map(rep => (
-                    <div 
-                      key={rep.callsign}
-                      className="p-3 bg-elevated rounded-lg"
-                      style={{ borderRadius: '8px' }}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-mono text-primary text-sm">{rep.callsign}</span>
-                        <span className="px-2 py-0.5 rounded-full text-xs bg-surface text-text-secondary" style={{ borderRadius: '99px' }}>
-                          {rep.band}
-                        </span>
+                {loadingRepeaters ? (
+                  <div className="flex items-center gap-2 text-text-secondary text-xs">
+                    <IconLoader2 size={14} className="animate-spin" />
+                    Loading repeaters...
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {repeaters.map(rep => (
+                      <div
+                        key={rep.callsign}
+                        className="p-3 bg-elevated rounded-lg"
+                        style={{ borderRadius: '8px' }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-mono text-primary text-sm">{rep.callsign}</span>
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-surface text-text-secondary" style={{ borderRadius: '99px' }}>
+                            {rep.band}
+                          </span>
+                        </div>
+                        <div className="text-xs text-text-secondary">
+                          {rep.frequency} ({rep.offset}) · PL {rep.pl}
+                        </div>
+                        <div className="text-xs text-text-tertiary mt-0.5">{rep.location}</div>
                       </div>
-                      <div className="text-xs text-text-secondary">
-                        {rep.frequency} ({rep.offset}) · PL {rep.pl}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* ARRL Band Plan */}
@@ -195,7 +254,7 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
                 <h3 className="text-sm font-semibold text-text-primary mb-3">ARRL Band Plan</h3>
                 <div className="space-y-2">
                   {bandPlan.map(plan => (
-                    <div 
+                    <div
                       key={plan.band}
                       className="p-2 bg-elevated rounded-lg text-xs"
                       style={{ borderRadius: '8px' }}
@@ -210,9 +269,11 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center pt-4">
-              <span 
+          )}
+
+          {!panelExpanded && (
+            <div className="flex flex-col items-center pt-4 flex-1">
+              <span
                 className="text-xs text-text-tertiary font-medium tracking-wide"
                 style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
               >
@@ -220,11 +281,10 @@ export default function HamRadioTab({ sidebarExpanded, setSidebarExpanded }: Ham
               </span>
             </div>
           )}
-          
-          {/* Toggle Button */}
+
           <button
             onClick={() => setPanelExpanded(!panelExpanded)}
-            className="w-8 flex items-center justify-center hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary border-l"
+            className="w-8 flex items-center justify-center hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary border-l flex-shrink-0"
             style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
           >
             {panelExpanded ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
