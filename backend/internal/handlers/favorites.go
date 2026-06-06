@@ -6,32 +6,42 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	authMiddleware "github.com/liannarnold/skysignallab/internal/middleware"
 	"github.com/liannarnold/skysignallab/internal/db"
+	authMiddleware "github.com/liannarnold/skysignallab/internal/middleware"
 	"github.com/rs/zerolog/log"
 )
 
 type Favorite struct {
-	ID        string  `json:"id"`
-	SignalID  string  `json:"signal_id"`
-	Frequency float64 `json:"frequency"`
-	Mode      string  `json:"mode"`
-	Description string `json:"description"`
-	Category  string  `json:"category"`
-	Band      string  `json:"band,omitempty"`
-	Notes     string  `json:"notes,omitempty"`
-	CreatedAt string  `json:"created_at"`
+	ID          string  `json:"id"          example:"d551cff8-efd1-463c-811a-8fa48fc696d6"`
+	SignalID    string  `json:"signal_id"   example:"a1b2c3d4-e5f6-7890-abcd-ef1234567890"`
+	Frequency   float64 `json:"frequency"   example:"162.4"`
+	Mode        string  `json:"mode"        example:"NFM"`
+	Description string  `json:"description" example:"NOAA Weather Radio"`
+	Category    string  `json:"category"    example:"Weather"`
+	Band        string  `json:"band,omitempty" example:"2m"`
+	Notes       string  `json:"notes,omitempty" example:"My local weather station"`
+	CreatedAt   string  `json:"created_at"  example:"2026-06-05T00:00:00Z"`
 }
 
 type AddFavoriteRequest struct {
-	SignalID string `json:"signal_id"`
-	Notes   string `json:"notes"`
+	SignalID string `json:"signal_id" example:"a1b2c3d4-e5f6-7890-abcd-ef1234567890"`
+	Notes    string `json:"notes"     example:"My local weather station"`
 }
 
 type UpdateFavoriteRequest struct {
-	Notes string `json:"notes"`
+	Notes string `json:"notes" example:"Updated note"`
 }
 
+// GetFavorites godoc
+// @Summary      Get user favorites
+// @Description  Returns all favorited signals for the authenticated user
+// @Tags         favorites
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   Favorite
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      500  {object}  handlers.ErrorResponse
+// @Router       /favorites [get]
 func GetFavorites(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 
@@ -65,6 +75,19 @@ func GetFavorites(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(favorites)
 }
 
+// AddFavorite godoc
+// @Summary      Add a favorite
+// @Description  Saves a signal to the authenticated user's favorites
+// @Tags         favorites
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request  body      AddFavoriteRequest  true  "Signal to favorite"
+// @Success      201      {object}  IDResponse
+// @Failure      400      {object}  handlers.ErrorResponse
+// @Failure      401      {object}  handlers.ErrorResponse
+// @Failure      409      {object}  handlers.ErrorResponse
+// @Router       /favorites [post]
 func AddFavorite(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 
@@ -95,9 +118,21 @@ func AddFavorite(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"id": id})
+	json.NewEncoder(w).Encode(IDResponse{ID: id})
 }
 
+// RemoveFavorite godoc
+// @Summary      Remove a favorite
+// @Description  Removes a signal from the authenticated user's favorites
+// @Tags         favorites
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Favorite ID"
+// @Success      204  "No content"
+// @Failure      401  {object}  handlers.ErrorResponse
+// @Failure      404  {object}  handlers.ErrorResponse
+// @Failure      500  {object}  handlers.ErrorResponse
+// @Router       /favorites/{id} [delete]
 func RemoveFavorite(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 	id := chi.URLParam(r, "id")
@@ -120,6 +155,21 @@ func RemoveFavorite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// UpdateFavorite godoc
+// @Summary      Update favorite notes
+// @Description  Updates the personal notes on a favorited signal
+// @Tags         favorites
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path      string               true  "Favorite ID"
+// @Param        request  body      UpdateFavoriteRequest  true  "Updated notes"
+// @Success      200      {object}  handlers.MessageResponse
+// @Failure      400      {object}  handlers.ErrorResponse
+// @Failure      401      {object}  handlers.ErrorResponse
+// @Failure      404      {object}  handlers.ErrorResponse
+// @Failure      500      {object}  handlers.ErrorResponse
+// @Router       /favorites/{id} [patch]
 func UpdateFavorite(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 	id := chi.URLParam(r, "id")

@@ -25,9 +25,9 @@ type BandXML struct {
 }
 
 type BandCondition struct {
-	Band      string `json:"band"`
-	Time      string `json:"time"`
-	Condition string `json:"condition"`
+	Band      string `json:"band"      example:"80m-40m"`
+	Time      string `json:"time"      example:"day"`
+	Condition string `json:"condition" example:"Good"`
 }
 
 func FetchBandConditions() ([]BandCondition, error) {

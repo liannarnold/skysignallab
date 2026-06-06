@@ -12,23 +12,33 @@ import (
 )
 
 type UserSignal struct {
-	ID          string  `json:"id"`
-	Frequency   float64 `json:"frequency"`
-	Mode        string  `json:"mode"`
-	Description string  `json:"description"`
-	Category    string  `json:"category,omitempty"`
-	Band        string  `json:"band,omitempty"`
-	CreatedAt   string  `json:"created_at"`
+	ID          string  `json:"id"          example:"d551cff8-efd1-463c-811a-8fa48fc696d6"`
+	Frequency   float64 `json:"frequency"   example:"162.4"`
+	Mode        string  `json:"mode"        example:"NFM"`
+	Description string  `json:"description" example:"NOAA Weather Radio"`
+	Category    string  `json:"category,omitempty" example:"Weather"`
+	Band        string  `json:"band,omitempty"     example:"2m"`
+	CreatedAt   string  `json:"created_at"  example:"2026-06-05T00:00:00Z"`
 }
 
 type UserSignalRequest struct {
-	Frequency   float64 `json:"frequency"`
-	Mode        string  `json:"mode"`
-	Description string  `json:"description"`
-	Category    string  `json:"category"`
-	Band        string  `json:"band"`
+	Frequency   float64 `json:"frequency"   example:"162.4"`
+	Mode        string  `json:"mode"        example:"NFM"`
+	Description string  `json:"description" example:"NOAA Weather Radio"`
+	Category    string  `json:"category"    example:"Weather"`
+	Band        string  `json:"band"        example:"2m"`
 }
 
+// GetUserSignals godoc
+// @Summary      Get user signals
+// @Description  Returns all custom signals created by the authenticated user
+// @Tags         user-signals
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {array}   UserSignal
+// @Failure      401  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /user-signals [get]
 func GetUserSignals(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 
@@ -60,6 +70,19 @@ func GetUserSignals(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(signals)
 }
 
+// CreateUserSignal godoc
+// @Summary      Create a user signal
+// @Description  Creates a new custom signal for the authenticated user
+// @Tags         user-signals
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request  body      UserSignalRequest  true  "Signal details"
+// @Success      201      {object}  IDResponse
+// @Failure      400      {object}  ErrorResponse
+// @Failure      401      {object}  ErrorResponse
+// @Failure      500      {object}  ErrorResponse
+// @Router       /user-signals [post]
 func CreateUserSignal(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 
@@ -90,9 +113,24 @@ func CreateUserSignal(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"id": id})
+	json.NewEncoder(w).Encode(IDResponse{ID: id})
 }
 
+// UpdateUserSignal godoc
+// @Summary      Update a user signal
+// @Description  Updates an existing custom signal owned by the authenticated user
+// @Tags         user-signals
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id       path      string             true  "Signal ID"
+// @Param        request  body      UserSignalRequest  true  "Updated signal details"
+// @Success      200      {object}  MessageResponse
+// @Failure      400      {object}  ErrorResponse
+// @Failure      401      {object}  ErrorResponse
+// @Failure      404      {object}  ErrorResponse
+// @Failure      500      {object}  ErrorResponse
+// @Router       /user-signals/{id} [put]
 func UpdateUserSignal(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 	id := chi.URLParam(r, "id")
@@ -124,6 +162,18 @@ func UpdateUserSignal(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"message":"signal updated"}`))
 }
 
+// DeleteUserSignal godoc
+// @Summary      Delete a user signal
+// @Description  Deletes a custom signal owned by the authenticated user
+// @Tags         user-signals
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Signal ID"
+// @Success      204  "No content"
+// @Failure      401  {object}  ErrorResponse
+// @Failure      404  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /user-signals/{id} [delete]
 func DeleteUserSignal(w http.ResponseWriter, r *http.Request) {
 	user := authMiddleware.GetUser(r)
 	id := chi.URLParam(r, "id")

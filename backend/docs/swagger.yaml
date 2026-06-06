@@ -1,5 +1,131 @@
 basePath: /api
 definitions:
+  auth.AuthResponse:
+    properties:
+      is_admin:
+        example: false
+        type: boolean
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user_id:
+        example: d551cff8-efd1-463c-811a-8fa48fc696d6
+        type: string
+      username:
+        example: liannarnold
+        type: string
+    type: object
+  auth.LoginRequest:
+    properties:
+      email:
+        example: liane@example.com
+        type: string
+      password:
+        example: SecurePassword123
+        type: string
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        example: liane@example.com
+        type: string
+      password:
+        example: SecurePassword123
+        type: string
+      username:
+        example: liannarnold
+        type: string
+    type: object
+  external.BandCondition:
+    properties:
+      band:
+        example: 80m-40m
+        type: string
+      condition:
+        example: Good
+        type: string
+      time:
+        example: day
+        type: string
+    type: object
+  handlers.AddFavoriteRequest:
+    properties:
+      notes:
+        example: My local weather station
+        type: string
+      signal_id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+    type: object
+  handlers.ErrorResponse:
+    properties:
+      error:
+        example: something went wrong
+        type: string
+    type: object
+  handlers.Favorite:
+    properties:
+      band:
+        example: 2m
+        type: string
+      category:
+        example: Weather
+        type: string
+      created_at:
+        example: "2026-06-05T00:00:00Z"
+        type: string
+      description:
+        example: NOAA Weather Radio
+        type: string
+      frequency:
+        example: 162.4
+        type: number
+      id:
+        example: d551cff8-efd1-463c-811a-8fa48fc696d6
+        type: string
+      mode:
+        example: NFM
+        type: string
+      notes:
+        example: My local weather station
+        type: string
+      signal_id:
+        example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+        type: string
+    type: object
+  handlers.IDResponse:
+    properties:
+      id:
+        example: d551cff8-efd1-463c-811a-8fa48fc696d6
+        type: string
+    type: object
+  handlers.MessageResponse:
+    properties:
+      message:
+        example: operation successful
+        type: string
+    type: object
+  handlers.Repeater:
+    properties:
+      band:
+        example: 2m
+        type: string
+      callsign:
+        example: W5SLA
+        type: string
+      frequency:
+        example: "146.9400"
+        type: string
+      location:
+        example: Shreveport, LA
+        type: string
+      offset:
+        example: '-'
+        type: string
+      pl:
+        example: "100.0"
+        type: string
+    type: object
   handlers.Signal:
     properties:
       band:
@@ -17,6 +143,54 @@ definitions:
       mode:
         type: string
     type: object
+  handlers.UpdateFavoriteRequest:
+    properties:
+      notes:
+        example: Updated note
+        type: string
+    type: object
+  handlers.UserSignal:
+    properties:
+      band:
+        example: 2m
+        type: string
+      category:
+        example: Weather
+        type: string
+      created_at:
+        example: "2026-06-05T00:00:00Z"
+        type: string
+      description:
+        example: NOAA Weather Radio
+        type: string
+      frequency:
+        example: 162.4
+        type: number
+      id:
+        example: d551cff8-efd1-463c-811a-8fa48fc696d6
+        type: string
+      mode:
+        example: NFM
+        type: string
+    type: object
+  handlers.UserSignalRequest:
+    properties:
+      band:
+        example: 2m
+        type: string
+      category:
+        example: Weather
+        type: string
+      description:
+        example: NOAA Weather Radio
+        type: string
+      frequency:
+        example: 162.4
+        type: number
+      mode:
+        example: NFM
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -25,6 +199,256 @@ info:
   title: SkySignalLab API
   version: "1.0"
 paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns a JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Logs out the current user (client should discard the JWT token)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+      summary: Logout
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account and returns a JWT token
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/auth.AuthResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /band-conditions:
+    get:
+      description: Returns current HF band conditions from hamqsl.com
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/external.BandCondition'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Get HF band conditions
+      tags:
+      - external
+  /favorites:
+    get:
+      description: Returns all favorited signals for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.Favorite'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user favorites
+      tags:
+      - favorites
+    post:
+      consumes:
+      - application/json
+      description: Saves a signal to the authenticated user's favorites
+      parameters:
+      - description: Signal to favorite
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AddFavoriteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.IDResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a favorite
+      tags:
+      - favorites
+  /favorites/{id}:
+    delete:
+      description: Removes a signal from the authenticated user's favorites
+      parameters:
+      - description: Favorite ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a favorite
+      tags:
+      - favorites
+    patch:
+      consumes:
+      - application/json
+      description: Updates the personal notes on a favorited signal
+      parameters:
+      - description: Favorite ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated notes
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateFavoriteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update favorite notes
+      tags:
+      - favorites
+  /repeaters:
+    get:
+      description: Returns local amateur radio repeaters near Bossier City, LA
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.Repeater'
+            type: array
+      summary: Get local repeaters
+      tags:
+      - external
   /signals:
     get:
       description: Returns all signals with optional filters
@@ -86,6 +510,141 @@ paths:
       summary: Get a single signal
       tags:
       - signals
+  /user-signals:
+    get:
+      description: Returns all custom signals created by the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.UserSignal'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user signals
+      tags:
+      - user-signals
+    post:
+      consumes:
+      - application/json
+      description: Creates a new custom signal for the authenticated user
+      parameters:
+      - description: Signal details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UserSignalRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.IDResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a user signal
+      tags:
+      - user-signals
+  /user-signals/{id}:
+    delete:
+      description: Deletes a custom signal owned by the authenticated user
+      parameters:
+      - description: Signal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a user signal
+      tags:
+      - user-signals
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing custom signal owned by the authenticated user
+      parameters:
+      - description: Signal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated signal details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UserSignalRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a user signal
+      tags:
+      - user-signals
 securityDefinitions:
   BearerAuth:
     in: header
