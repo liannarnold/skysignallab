@@ -20,7 +20,7 @@ function App() {
 
   // Update CSS variable when accent color changes
   useEffect(() => {
-    document.documentElement.style.setProperty('--color-primary', accentColor)
+    document.documentElement.style.setProperty('--accent-color', accentColor)
   }, [accentColor])
 
   const renderTab = () => {

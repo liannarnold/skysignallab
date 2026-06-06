@@ -9,7 +9,7 @@
   --color-elevated: #1c2440;
   --color-border-subtle: #1c2440;
   --color-border-emphasis: #2d3a5e;
-  --color-primary: #fb923c;
+  --color-primary: var(--accent-color);
   --color-text-primary: #c8d4f0;
   --color-text-secondary: #93a8d4;
   --color-text-tertiary: #4a5e99;
@@ -22,6 +22,10 @@
   --color-error-bg: #2d1010;
   --color-selected: #fef08a;
   --color-military: #93a8d4;
+}
+
+:root {
+  --accent-color: #fb923c;
 }
 
 * {

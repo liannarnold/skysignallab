@@ -34,9 +34,9 @@ export default function LoginModal() {
         
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <IconRadio size={28} style={{ color: '#fb923c' }} />
+          <IconRadio size={28} style={{ color: 'var(--accent-color)' }} />
           <div>
-            <div className="font-semibold text-lg" style={{ color: '#fb923c' }}>SkySignalLab</div>
+            <div className="font-semibold text-lg" style={{ color: 'var(--accent-color)' }}>SkySignalLab</div>
             <div className="text-xs" style={{ color: '#2d3a5e' }}>SDR Companion</div>
           </div>
         </div>
@@ -48,7 +48,7 @@ export default function LoginModal() {
             className="flex-1 py-2 text-sm font-medium transition-colors"
             style={{
               background: mode === 'login' ? '#1c2440' : 'transparent',
-              color: mode === 'login' ? '#fb923c' : '#2d3a5e',
+              color: mode === 'login' ? 'var(--accent-color)' : '#2d3a5e',
             }}
           >
             Login
@@ -58,7 +58,7 @@ export default function LoginModal() {
             className="flex-1 py-2 text-sm font-medium transition-colors"
             style={{
               background: mode === 'register' ? '#1c2440' : 'transparent',
-              color: mode === 'register' ? '#fb923c' : '#2d3a5e',
+              color: mode === 'register' ? 'var(--accent-color)' : '#2d3a5e',
             }}
           >
             Register
@@ -128,7 +128,7 @@ export default function LoginModal() {
             type="submit"
             disabled={loading}
             className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50 mt-2"
-            style={{ background: '#fb923c', color: '#0b0f1a' }}
+            style={{ background: 'var(--accent-color)', color: '#0b0f1a' }}
           >
             {loading && <IconLoader2 size={16} className="animate-spin" />}
             {mode === 'login' ? 'Sign in' : 'Create account'}

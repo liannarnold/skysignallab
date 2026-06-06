@@ -280,7 +280,7 @@ export default function FmAmTab({ sidebarExpanded, setSidebarExpanded }: FmAmTab
                       idx === filteredStations.length - 1 ? 'border-b-0' : ''
                     } ${isActive ? 'bg-primary/10' : 'hover:bg-elevated/30'}`}
                     style={{ 
-                      borderColor: isActive ? '#fb923c' : '#1c2440', 
+                      borderColor: isActive ? 'var(--accent-color)' : '#1c2440', 
                       borderWidth: '0.5px',
                       borderLeftWidth: isActive ? '2px' : '0.5px'
                     }}
