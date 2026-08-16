@@ -58,7 +58,7 @@ A full-stack SDR (Software Defined Radio) companion app for browsing radio frequ
 | Database | PostgreSQL (Supabase) |
 | Containerization | Docker + Docker Compose |
 | CI/CD | GitHub Actions |
-| Hosting | Oracle Cloud ARM VM + Vercel |
+| Hosting | Local machine (API, Docker) + Vercel (frontend) — Raspberry Pi planned |
 | Logging | zerolog |
 | API Docs | Swagger / OpenAPI |
 
@@ -74,7 +74,8 @@ A full-stack SDR (Software Defined Radio) companion app for browsing radio frequ
                        │ HTTPS
 ┌──────────────────────▼──────────────────────────┐
 │              Go API (Chi router)                │
-│         Oracle Cloud ARM Ampere VM              │
+│      Local machine — Docker (Raspberry Pi       │
+│              planned for always-on)             │
 │                                                 │
 │  /api/auth        JWT auth                      │
 │  /api/signals     Signal database               │
@@ -132,19 +133,27 @@ docker compose up --build
 The API will be available at `http://localhost:8080`
 Swagger docs at `http://localhost:8080/swagger/index.html`
 
+**Regenerating Swagger docs** (after adding/changing Swagger annotations in handlers):
+
+```bash
+cd backend
+export PATH=$PATH:$(go env GOPATH)/bin   # if swag isn't found
+swag init -g cmd/main.go -o docs
+```
+
 ### Frontend
 
 ```bash
 cd frontend
 
 # Install dependencies
-npm install
+pnpm install
 
 # Create .env.local
 echo "VITE_API_URL=http://localhost:8080" > .env.local
 
 # Run dev server
-npm run dev
+pnpm run dev
 ```
 
 The app will be available at `http://localhost:5173`
@@ -196,27 +205,32 @@ Full interactive documentation available at `/swagger/index.html`
 
 ## CI/CD Pipeline
 
+Implemented in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
 ```
-Push to main
+Push / PR to main
     ↓
-GitHub Actions
+┌───────────────────┬────────────────────┐
+│  backend-test     │  frontend-build    │   (always run)
+│  go vet + go test │  tsc + vite build  │
+└───────────────────┴────────────────────┘
+    ↓ (push to main only)
+docker-build-push
+  build linux/arm64 image → ghcr.io/<repo>
+    ↓ (manual for now — API is hosted locally)
+docker compose pull && docker compose up -d --force-recreate
     ↓
-Run Go unit tests
-    ↓
-Build Docker image (linux/arm64)
-    ↓
-Push to GitHub Container Registry
-    ↓
-SSH into Oracle Cloud ARM VM
-    ↓
-Pull new image + restart container
-    ↓
-Vercel auto-deploys React frontend
+Vercel auto-deploys React frontend (via Vercel's own GitHub integration, once connected)
 ```
+
+No automated deploy job yet — the API runs locally (Docker), so there's nothing to SSH into. Once it moves to a Raspberry Pi, an automated deploy step (likely over Tailscale, to avoid home-network port forwarding) is worth adding back.
 
 ---
 
 ## Roadmap
+
+### Hosting
+- [ ] Move the Go API from local hosting onto a dedicated Raspberry Pi for always-on, low-power hosting
 
 ### V2 — ADS-B Integration (RTL-SDR kit required)
 - [ ] Live aircraft tracking via dump1090 + WebSocket
@@ -228,7 +242,6 @@ Vercel auto-deploys React frontend
 - [ ] SDR session management (single-user hardware lock)
 
 ### V3 — Future
-- [ ] React Native companion mobile app
 - [ ] Admin UI for managing signals database
 - [ ] Signal strength meter
 - [ ] OpenSky Network aircraft registration details
