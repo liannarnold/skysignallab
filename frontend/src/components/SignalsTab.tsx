@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import { IconSearch, IconPlus, IconCopy, IconStar, IconStarFilled, IconChevronLeft, IconChevronRight, IconLoader2 } from '@tabler/icons-react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
+import { IconSearch, IconPlus, IconCopy, IconStar, IconStarFilled, IconChevronLeft, IconChevronRight, IconLoader2, IconAdjustmentsHorizontal } from '@tabler/icons-react'
 import Topbar from './Topbar'
 import { signalsApi, favoritesApi } from '../services/api'
+import { getSdrSettings } from '../utils/sdrSettings'
 
 interface SignalsTabProps {
   sidebarExpanded: boolean
@@ -29,7 +30,31 @@ interface Favorite {
 }
 
 const categories = ['All', 'HAM', 'Weather', 'Aviation', 'Marine', 'Emergency', 'CB', 'Broadcast']
-const PAGE_SIZE = 8
+const PAGE_SIZE_OPTIONS = [15, 30, 50, 100]
+const DEFAULT_PAGE_SIZE = 15
+const PAGE_SIZE_KEY = 'signalsPageSize'
+
+// Page buttons: always first + last, plus a window around the current page, with gaps as '…'
+const getPageItems = (current: number, total: number): (number | '…')[] => {
+  const pages = new Set([1, total, current - 1, current, current + 1])
+  const sorted = [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b)
+  const items: (number | '…')[] = []
+  sorted.forEach((page, i) => {
+    if (i > 0 && page - sorted[i - 1] > 1) items.push('…')
+    items.push(page)
+  })
+  return items
+}
+
+// Remembered per browser; falls back to the default if storage is unavailable or the value is stale
+const loadPageSize = () => {
+  try {
+    const saved = Number(localStorage.getItem(PAGE_SIZE_KEY))
+    return PAGE_SIZE_OPTIONS.includes(saved) ? saved : DEFAULT_PAGE_SIZE
+  } catch {
+    return DEFAULT_PAGE_SIZE
+  }
+}
 
 const getModeColor = (mode: string) => {
   switch (mode) {
@@ -50,6 +75,8 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(loadPageSize)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   // Fetch signals from API
   const fetchSignals = useCallback(async () => {
@@ -128,10 +155,20 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
   )
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredSignals.length / PAGE_SIZE))
+  const changePageSize = (size: number) => {
+    setPageSize(size)
+    setCurrentPage(1)
+    try {
+      localStorage.setItem(PAGE_SIZE_KEY, String(size))
+    } catch {
+      // Storage unavailable (e.g. private window) — setting just won't persist
+    }
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filteredSignals.length / pageSize))
   const paginatedSignals = filteredSignals.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   )
 
   return (
@@ -153,7 +190,10 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
             type="text"
             placeholder="Search frequency or description..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
             className="w-full pl-10 pr-4 py-1.5 bg-elevated rounded-lg text-sm text-text-primary placeholder:text-text-tertiary border focus:outline-none focus:border-border-emphasis"
             style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
           />
@@ -208,10 +248,12 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
                     </td>
                   </tr>
                 ) : (
-                  paginatedSignals.map((signal, idx) => (
+                  paginatedSignals.map((signal, idx) => {
+                    const sdr = expandedId === signal.id ? getSdrSettings(signal.frequency, signal.mode) : null
+                    return (
+                    <Fragment key={signal.id}>
                     <tr
-                      key={signal.id}
-                      className={`border-b hover:bg-elevated/30 transition-colors ${idx === paginatedSignals.length - 1 ? 'border-b-0' : ''}`}
+                      className={`border-b hover:bg-elevated/30 transition-colors ${idx === paginatedSignals.length - 1 && !sdr ? 'border-b-0' : ''}`}
                       style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
                     >
                       <td className="px-4 py-3">
@@ -226,6 +268,14 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
                       <td className="px-4 py-3 text-text-primary text-sm">{signal.description}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setExpandedId(expandedId === signal.id ? null : signal.id)}
+                            className={`p-1.5 rounded-lg hover:bg-elevated transition-colors ${sdr ? 'text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+                            aria-label="SDR++ settings"
+                            title="SDR++ settings"
+                          >
+                            <IconAdjustmentsHorizontal size={16} />
+                          </button>
                           <button
                             onClick={() => copyFrequency(signal.frequency)}
                             className="p-1.5 rounded-lg hover:bg-elevated transition-colors text-text-secondary hover:text-text-primary"
@@ -247,7 +297,29 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
                         </div>
                       </td>
                     </tr>
-                  ))
+                    {sdr && (
+                      <tr
+                        className={`border-b bg-elevated/20 ${idx === paginatedSignals.length - 1 ? 'border-b-0' : ''}`}
+                        style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}
+                      >
+                        <td colSpan={5} className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+                            <span className="text-xs font-medium text-text-tertiary uppercase tracking-wide">SDR++</span>
+                            <span className="text-text-secondary">Demod <span className="font-mono text-text-primary">{sdr.demod}</span></span>
+                            <span className="text-text-secondary">Bandwidth <span className="font-mono text-text-primary">{sdr.bandwidthKhz} kHz</span></span>
+                            <span className="text-text-secondary">Squelch <span className="font-mono text-text-primary">{sdr.squelch ? 'On' : 'Off'}</span></span>
+                          </div>
+                          {sdr.notes.length > 0 && (
+                            <ul className="mt-2 space-y-0.5 text-xs text-text-secondary list-disc pl-4">
+                              {sdr.notes.map(note => <li key={note}>{note}</li>)}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -257,9 +329,24 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
 
       {/* Pagination */}
       <div className="px-4 py-3 flex items-center justify-between border-t" style={{ borderColor: '#1c2440', borderWidth: '0.5px' }}>
-        <span className="text-sm text-text-secondary">
-          Showing {paginatedSignals.length} of {filteredSignals.length} signals
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-text-secondary">
+            Showing {paginatedSignals.length} of {filteredSignals.length} signals
+          </span>
+          <label className="flex items-center gap-2 text-sm text-text-secondary">
+            Per page
+            <select
+              value={pageSize}
+              onChange={e => changePageSize(Number(e.target.value))}
+              className="px-2 py-1 rounded-lg text-sm focus:outline-none"
+              style={{ background: '#0b0f1a', border: '0.5px solid #1c2440', color: '#c8d4f0' }}
+            >
+              {PAGE_SIZE_OPTIONS.map(size => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -268,31 +355,22 @@ export default function SignalsTab({ sidebarExpanded, setSidebarExpanded }: Sign
           >
             <IconChevronLeft size={16} />
           </button>
-          {Array.from({ length: Math.min(totalPages, 3) }, (_, i) => i + 1).map(page => (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`w-8 h-8 rounded-lg text-sm transition-colors ${
-                currentPage === page
-                  ? 'bg-primary text-page-bg'
-                  : 'hover:bg-elevated text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              {page}
-            </button>
-          ))}
-          {totalPages > 3 && <span className="text-text-tertiary px-1">...</span>}
-          {totalPages > 3 && (
-            <button
-              onClick={() => setCurrentPage(totalPages)}
-              className={`w-8 h-8 rounded-lg text-sm transition-colors ${
-                currentPage === totalPages
-                  ? 'bg-primary text-page-bg'
-                  : 'hover:bg-elevated text-text-secondary hover:text-text-primary'
-              }`}
-            >
-              {totalPages}
-            </button>
+          {getPageItems(currentPage, totalPages).map((item, i) =>
+            item === '…' ? (
+              <span key={`gap-${i}`} className="text-text-tertiary px-1">…</span>
+            ) : (
+              <button
+                key={item}
+                onClick={() => setCurrentPage(item)}
+                className={`w-8 h-8 rounded-lg text-sm transition-colors ${
+                  currentPage === item
+                    ? 'bg-primary text-page-bg'
+                    : 'hover:bg-elevated text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {item}
+              </button>
+            )
           )}
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}

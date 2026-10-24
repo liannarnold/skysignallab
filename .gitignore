@@ -37,6 +37,3 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
-
-# Swagger docs (generated)
-backend/docs/

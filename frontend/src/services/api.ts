@@ -1,7 +1,7 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 // Helper to get auth header
-const authHeader = () => {
+const authHeader = (): Record<string, string> => {
   const token = localStorage.getItem('token')
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
@@ -13,7 +13,7 @@ const request = async (path: string, options: RequestInit = {}) => {
     headers: {
       'Content-Type': 'application/json',
       ...authHeader(),
-      ...options.headers,
+      ...(options.headers as Record<string, string> | undefined),
     },
   })
 

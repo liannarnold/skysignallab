@@ -2,6 +2,7 @@
   "name": "skysignallab",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@12.15.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,20 +10,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@tabler/icons-react": "^3.46.0",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@tabler/icons-react": "^3.49.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "leaflet": "^1.9.4",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "react-leaflet": "^5.0.0",
-    "vite": "^8.2.1"
+    "vite": "^8.3.5"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@types/leaflet": "^1.9.22",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "5.7.3"
+    "typescript": "7.0.2"
   }
 }

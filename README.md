@@ -1,8 +1,8 @@
 # SkySignalLab
 
-A full-stack SDR (Software Defined Radio) companion app for browsing radio frequencies, managing favorites, and tracking live ADS-B aircraft.
+A companion web app for SDR (Software Defined Radio): browse radio frequencies, save favorites, check HAM band conditions, and track ADS-B aircraft.
 
-![SkySignalLab](https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go)
+![Go](https://img.shields.io/badge/Go-1.27-00ADD8?style=flat&logo=go)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?style=flat&logo=supabase)
 ![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker)
@@ -12,37 +12,11 @@ A full-stack SDR (Software Defined Radio) companion app for browsing radio frequ
 
 ## Features
 
-### Signals
-- Browse a curated database of radio frequencies filtered by category (HAM, Weather, Aviation, Marine, Emergency, CB, Broadcast)
-- Search by frequency or description
-- Filter by mode (AM, FM, NFM, USB, LSB) and frequency range
-- Copy frequencies to clipboard with one click
-- Save favorites with personal notes
-
-### HAM Radio
-- Live HF band conditions pulled from hamqsl.com
-- Local repeater directory for the Shreveport/Bossier City area
-- ARRL band plan reference
-- Filter frequencies by HF, VHF, and UHF
-
-### FM / AM
-- Interactive frequency tuner with slider
-- Local Shreveport/Bossier City broadcast station directory
-- RDS now-playing metadata (requires RTL-SDR kit)
-- FM and AM band support
-
-### Aircraft
-- Live ADS-B aircraft tracking map (requires RTL-SDR kit + dump1090)
-- Real Leaflet.js map centered on local area
-- Commercial and military aircraft differentiation
-- Click-to-inspect aircraft detail drawer (callsign, altitude, speed, heading, route)
-
-### Account
-- JWT-based authentication (register, login, logout)
-- Personal favorites with notes
-- Custom user-defined signals (full CRUD)
-- CSV export and import of signal data
-- Accent color customization (WCAG AA accessible)
+- **Signals** — Browse a frequency database by category, search by frequency or description, show 15/30/50/100 per page, copy frequencies, and see suggested SDR++ settings (demod, bandwidth, squelch) for each signal.
+- **HAM Radio** — Live HF band conditions from hamqsl.com and a local Shreveport/Bossier City repeater list.
+- **FM / AM** — Interactive tuner and a local broadcast station directory.
+- **Aircraft** — Leaflet map with an aircraft detail drawer (shows mock data until an RTL-SDR + dump1090 feed is connected).
+- **Account** — Register/login, favorites with notes, custom signals, CSV import/export, and accent color themes.
 
 ---
 
@@ -50,201 +24,146 @@ A full-stack SDR (Software Defined Radio) companion app for browsing radio frequ
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19 (Vite), TypeScript, Tailwind CSS 4 |
-| Map | Leaflet.js + react-leaflet |
-| Icons | Tabler Icons |
-| Backend | Go 1.26, Chi router |
-| Auth | JWT (golang-jwt) |
+| Frontend | React 19 (Vite), TypeScript, Tailwind CSS 4, Leaflet, Tabler Icons |
+| Backend | Go 1.27, Chi router, zerolog, Swagger (swaggo) |
+| Auth | JWT + bcrypt |
 | Database | PostgreSQL (Supabase) |
-| Containerization | Docker + Docker Compose |
-| CI/CD | GitHub Actions |
-| Hosting | Local machine (API, Docker) + Vercel (frontend) — Raspberry Pi planned |
-| Logging | zerolog |
-| API Docs | Swagger / OpenAPI |
-
----
-
-## Architecture
+| Tooling | Docker Compose, GitHub Actions, pnpm |
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   React (Vite)                  │
-│              Vercel — Static hosting            │
-└──────────────────────┬──────────────────────────┘
-                       │ HTTPS
-┌──────────────────────▼──────────────────────────┐
-│              Go API (Chi router)                │
-│      Local machine — Docker (Raspberry Pi       │
-│              planned for always-on)             │
-│                                                 │
-│  /api/auth        JWT auth                      │
-│  /api/signals     Signal database               │
-│  /api/favorites   User favorites                │
-│  /api/user-signals Custom signals               │
-│  /api/band-conditions → hamqsl.com proxy        │
-│  /api/repeaters   Local repeater directory      │
-│  /ws/aircraft     WebSocket (V2 — ADS-B)        │
-└──────────────────────┬──────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────┐
-│           PostgreSQL (Supabase)                 │
-│  users · signals · favorites · user_signals     │
-│  signal_tags · sdr_session                      │
-└─────────────────────────────────────────────────┘
-                       │ (V2)
-┌──────────────────────▼──────────────────────────┐
-│         RTL-SDR Kit + dump1090                  │
-│    ADS-B decoder → Go WebSocket hub             │
-└─────────────────────────────────────────────────┘
+React (Vite)  ──HTTPS──▶  Go API (Chi)  ──▶  PostgreSQL (Supabase)
+                               │
+                               └──▶  hamqsl.com (band conditions)
 ```
 
 ---
 
-## Local Development
+## Getting Started
 
-### Prerequisites
-- Go 1.26+
-- Node.js 20+
-- Docker + Docker Compose
+### 1. Prerequisites
+
+- Go 1.27+
+- Node.js 24 (run `nvm use` — the repo includes `.nvmrc`)
+- pnpm 12
+- Docker (optional, for running the API in a container)
 - A [Supabase](https://supabase.com) project
 
-### Backend
+### 2. Set up the database
+
+In the Supabase SQL Editor, run these files in order:
+
+1. `backend/migrations/001_initial_schema.sql` — creates the tables
+2. `backend/migrations/002_signal_setup.sql` — seeds the signal list
+
+### 3. Start the backend
+
+Create `backend/.env`:
+
+```env
+DATABASE_URL="postgresql://..."   # Supabase Session Pooler connection string
+JWT_SECRET=any-long-random-string
+PORT=8080                         # optional, defaults to 8080
+```
+
+> Use the **Session Pooler** connection string, not Direct Connection — Direct is IPv6-only and fails on most home networks. If your password contains `#`, keep the value in double quotes.
+
+To generate a `JWT_SECRET`:
+
+```bash
+openssl rand -base64 48
+```
+
+Paste the output as the value. Changing it later logs everyone out, since existing tokens will no longer verify.
+
+Then run it:
 
 ```bash
 cd backend
-
-# Install dependencies
-go mod download
-
-# Create .env file
-cp .env.example .env
-# Fill in DATABASE_URL and JWT_SECRET
-
-# Run database migrations
-# Paste backend/migrations/001_initial_schema.sql into Supabase SQL Editor
-
-# Run locally
 go run cmd/main.go
-
-# Or with Docker
-docker compose up --build
 ```
 
-The API will be available at `http://localhost:8080`
-Swagger docs at `http://localhost:8080/swagger/index.html`
-
-**Regenerating Swagger docs** (after adding/changing Swagger annotations in handlers):
+Or with Docker, from the repo root:
 
 ```bash
-cd backend
-export PATH=$PATH:$(go env GOPATH)/bin   # if swag isn't found
-swag init -g cmd/main.go -o docs
+docker compose up --build -d     # runs in the background
+docker compose logs -f api       # follow logs (Ctrl+C to stop following)
+docker compose down              # stop it
 ```
 
-### Frontend
+- API: http://localhost:8080
+- Swagger docs: http://localhost:8080/swagger/index.html
+
+### 4. Start the frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 pnpm install
-
-# Create .env.local
 echo "VITE_API_URL=http://localhost:8080" > .env.local
-
-# Run dev server
 pnpm run dev
 ```
 
-The app will be available at `http://localhost:5173`
+Open http://localhost:5173.
 
 ---
 
-## Database Schema
+## Common Tasks
 
-```sql
-users          — Auth accounts with admin flag
-signals        — Curated radio frequency database
-favorites      — User-saved signals with notes
-user_signals   — User-defined custom frequencies
-signal_tags    — Custom tags on signals
-sdr_session    — SDR hardware session management (V2)
-```
+| Task | Command |
+|---|---|
+| Run backend tests | `cd backend && go test ./...` |
+| Type-check frontend | `cd frontend && pnpm exec tsc --noEmit` |
+| Build frontend | `cd frontend && pnpm run build` |
+| Regenerate Swagger docs | `cd backend && swag init -g cmd/main.go -o docs` |
+
+If `swag` isn't found, install it with `go install github.com/swaggo/swag/cmd/swag@latest` and make sure `$(go env GOPATH)/bin` is on your `PATH`.
 
 ---
 
 ## API Endpoints
 
-### Public
-```
-GET  /health
-GET  /api/signals
-GET  /api/signals/:id
-GET  /api/band-conditions
-GET  /api/repeaters
-```
+Full interactive docs are at `/swagger/index.html`.
 
-### Protected (Bearer token required)
+**Public**
+
 ```
+GET    /health
 POST   /api/auth/register
 POST   /api/auth/login
 POST   /api/auth/logout
+GET    /api/signals
+GET    /api/signals/{id}
+GET    /api/band-conditions
+GET    /api/repeaters
+```
+
+**Requires `Authorization: Bearer <token>`**
+
+```
 GET    /api/favorites
 POST   /api/favorites
-DELETE /api/favorites/:id
-PATCH  /api/favorites/:id
+PATCH  /api/favorites/{id}
+DELETE /api/favorites/{id}
 GET    /api/user-signals
 POST   /api/user-signals
-PUT    /api/user-signals/:id
-DELETE /api/user-signals/:id
+PUT    /api/user-signals/{id}
+DELETE /api/user-signals/{id}
 ```
-
-Full interactive documentation available at `/swagger/index.html`
 
 ---
 
-## CI/CD Pipeline
+## CI/CD
 
-Implemented in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and PR to `main`:
 
+- **backend-test** — `go vet` and `go test`
+- **frontend-build** — `tsc --noEmit` and `vite build`
+- **docker-build-push** (push to `main` only) — builds a `linux/arm64` image and pushes it to `ghcr.io` (verifies the image builds; deploys build locally)
+
+To deploy the API on the host machine:
+
+```bash
+git pull && docker compose up --build -d
 ```
-Push / PR to main
-    ↓
-┌───────────────────┬────────────────────┐
-│  backend-test     │  frontend-build    │   (always run)
-│  go vet + go test │  tsc + vite build  │
-└───────────────────┴────────────────────┘
-    ↓ (push to main only)
-docker-build-push
-  build linux/arm64 image → ghcr.io/<repo>
-    ↓ (manual for now — API is hosted locally)
-docker compose pull && docker compose up -d --force-recreate
-    ↓
-Vercel auto-deploys React frontend (via Vercel's own GitHub integration, once connected)
-```
-
-No automated deploy job yet — the API runs locally (Docker), so there's nothing to SSH into. Once it moves to a Raspberry Pi, an automated deploy step (likely over Tailscale, to avoid home-network port forwarding) is worth adding back.
-
----
-
-## Roadmap
-
-### Hosting
-- [ ] Move the Go API from local hosting onto a dedicated Raspberry Pi for always-on, low-power hosting
-
-### V2 — ADS-B Integration (RTL-SDR kit required)
-- [ ] Live aircraft tracking via dump1090 + WebSocket
-- [ ] Historical aircraft sighting logs
-- [ ] Flight path trails on map
-- [ ] RepeaterBook API integration (replace hardcoded repeaters)
-- [ ] RDS now-playing metadata via redsea decoder
-- [ ] Redis caching for signals and aircraft feed
-- [ ] SDR session management (single-user hardware lock)
-
-### V3 — Future
-- [ ] Admin UI for managing signals database
-- [ ] Signal strength meter
-- [ ] OpenSky Network aircraft registration details
 
 ---
 
@@ -252,23 +171,24 @@ No automated deploy job yet — the API runs locally (Docker), so there's nothin
 
 ```
 skysignallab/
-├── frontend/                  # React app (Vite + TypeScript)
-│   ├── src/
-│   │   ├── components/        # Tab components + shared UI
-│   │   ├── context/           # Auth context
-│   │   └── services/          # API service layer
 ├── backend/
-│   ├── cmd/                   # main.go entry point
+│   ├── cmd/main.go        # Entry point and routes
 │   ├── internal/
-│   │   ├── auth/              # JWT auth handlers
-│   │   ├── handlers/          # HTTP route handlers
-│   │   ├── middleware/        # JWT, rate limiting, logging
-│   │   ├── db/                # PostgreSQL connection pool
-│   │   └── external/          # Third-party API clients
-│   ├── migrations/            # SQL schema
-│   └── docs/                  # Swagger generated docs
+│   │   ├── auth/          # Register, login, JWT
+│   │   ├── handlers/      # HTTP handlers
+│   │   ├── middleware/    # Auth, rate limiting, logging
+│   │   ├── db/            # Postgres connection pool
+│   │   └── external/      # Third-party API clients
+│   ├── migrations/        # SQL schema and seed data
+│   └── docs/              # Generated Swagger docs
+├── frontend/
+│   └── src/
+│       ├── components/    # One component per tab
+│       ├── context/       # Auth context
+│       ├── services/      # API client (all fetch calls)
+│       └── utils/         # Helpers (e.g. SDR++ settings)
 ├── docker-compose.yml
-└── .github/workflows/         # GitHub Actions CI/CD
+└── .github/workflows/     # CI/CD
 ```
 
 ---
